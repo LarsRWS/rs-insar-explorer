@@ -1,3 +1,5 @@
+from calendar import c
+from stringprep import c22_specials
 from qgis.PyQt.QtWidgets import QApplication
 from qgis.PyQt.QtCore import Qt
 from qgis.core import (QgsPointXY, QgsGeometry, QgsMapLayer, QgsRectangle, QgsFeatureRequest, QgsSettings, Qgis,
@@ -9,6 +11,10 @@ from . import plot_timeseries as pts
 from .layer_utils import vector_layer as vector_layer_utils
 from .layer_utils import gmtsar_layer as gmtsar_layer_utils
 from .layer_utils import raster_layer as raster_layer_utils
+
+from numpy import isnan as np_isnan
+import matplotlib.colors as mcolors
+color_keys = list(mcolors.TABLEAU_COLORS.keys())
 
 
 class MapClickHandler:
@@ -75,7 +81,9 @@ class MapClickHandler:
             attributes_text = "\n".join(
                 [f"{field.name()}: {value}" for field, value in zip(layer.fields(), closest_feature.attributes())]
             )
-            point = closest_feature.geometry().asPoint()
+
+            # Centroid is required for polygons
+            point = closest_feature.geometry().centroid().asPoint()
             if point:
                 x, y = point.x(), point.y()
                 coordinates_text = f"Coordinates: ({x:.5f}, {y:.5f})\n"
@@ -212,16 +220,29 @@ class TSClickHandler(MapClickHandler):
             self.ui.lb_msg_bar.setText(message)
             return
 
+        bool_init = True
+        marker_color = None
         if feature:
             attributes = vector_layer_utils.getFeatureAttributes(feature)
-            date_values = vector_layer_utils.extractDateValueAttributes(attributes)
-            if not ref:
-                self.ts_values = date_values[:, 1]
-            else:
-                self.ref_values = date_values[:, 1]
+            d_date_values = vector_layer_utils.extractDateValueAttributes(attributes)
+            for k, (key, date_values) in enumerate(d_date_values.items()):
+                # Skip if empty
+                if not date_values.size:
+                    continue
 
-            dates = date_values[:, 0]
-            self.plot_ts.plotTs(dates=dates, ts_values=self.ts_values, ref_values=self.ref_values)
+                # If all data is zero
+                if all([(ele == 0) or np_isnan(ele) for ele in date_values[:, 1]]):                    
+                    continue                    
+
+                if not ref:
+                    self.ts_values = date_values[:, 1]
+                else:
+                    self.ref_values = date_values[:, 1]
+
+                dates = date_values[:, 0]
+                self.plot_ts.plotTs(dates=dates, ts_values=self.ts_values, ref_values=self.ref_values, bool_init=bool_init, marker_color=marker_color, tag=key.upper())
+                bool_init = False
+                marker_color = mcolors.TABLEAU_COLORS[color_keys[k+2]]
 
     def choosePointClickedRaster(self, *, point: QgsPointXY, layer: QgsMapLayer = None, ref=False):
         status, message = gmtsar_layer_utils.checkGmtsarLayerTimeseries(layer)

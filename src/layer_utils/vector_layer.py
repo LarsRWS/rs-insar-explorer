@@ -16,8 +16,8 @@ def checkVectorLayer(layer):
     elif not (layer.type() == QgsMapLayer.VectorLayer):
         message = '<span style="color:red;">This is not a vector layer: Please select a valid vector layer.</span>'
         return False, message
-    elif not (layer.geometryType() == 0):
-        message = '<span style="color:red;">Invalid Layer: Please select a valid point layer.</span>'
+    elif layer.geometryType() not in [0, 2]:
+        message = '<span style="color:red;">Invalid Layer: Please select a valid point or polygon layer.</span>'
         return False, message
     else:
         return True, ""
@@ -26,26 +26,51 @@ def checkVectorLayer(layer):
 def getVectorVelocityFieldName(layer):
     """ check layer is a valid vector with velocity """
 
-    velocity_field_name_options = ['velocity', 'VEL', 'mean_velocity']
+    rgx_dt = r'(.*)(vel|deformation.?rate|mean.?deformation)(.*)'
+    pattern = re.compile(rgx_dt, re.IGNORECASE)
     field_name = None
     message = ""
-    for velocity_field in velocity_field_name_options:
-        if layer.fields().lookupField(velocity_field) != -1:
-            field_name = velocity_field
-            break
+
+    keys_uncertainty = ['err', 'sigma', 'std']
+    matches = []
+    for field in layer.fields():
+        p = pattern.match(field.name())
+        if not p:
+            continue
+
+        # Check if this is not an uncertainty layer of the velocity
+        if any([ele in field.name() for ele in keys_uncertainty]):
+            continue
+
+        matches.append(field.name())
+
+    # 0 to n matches possible
+    if not matches:
+        field_name = None
+    elif len(matches) > 1:
+        velocity_field_name_options = ['velocity', 'VEL', 'mean_velocity', 'deformation rate']
+        # Pick the one with an exact substring match, otherwise just take the first
+        field_name = matches[0]
+        for velocity_field_name in velocity_field_name_options:
+            for match in matches:
+                if velocity_field_name in match:
+                    field_name = match
+                    break
+            else:
+                break
+    else:
+        field_name = matches[0]
 
     if field_name is None:
-        joined_names = ',&nbsp;'.join(velocity_field_name_options)
-        message = (f'<span style="color:red;">Invalid Layer: Please select a vector layer with valid velocity field.'
-                   f'.&nbsp;Supported field names: [{joined_names}].</span>')
+        message = ('<span style="color:red;">Invalid Layer: Please select a vector layer with valid velocity field.</span>')
 
     return field_name, message
 
 
 def checkVectorLayerTimeseries(layer):
     """ check layer is a valid vector with velocity """
-    pattern_options = [r'^D(\d{8})$', r'(\d{8})$', r'^D_(\d{8})$']
-    date_field_patterns = [re.compile(pattern) for pattern in pattern_options]
+    rgx_dt = r'(.*)((19|20)\d{2}[\s\-\._]?[01]\d[\s\-\.]?[0123]\d)T?([012]\d[:\.]?[0-5]\d[0-5]?\d?)?(.*)'
+    pattern = re.compile(rgx_dt, re.IGNORECASE)
 
     count = 0
     message = ""
@@ -54,17 +79,14 @@ def checkVectorLayerTimeseries(layer):
     if status is False:
         return status, message
 
+    status = False
     for field in layer.fields():
-        match = [pattern.match(field.name()) for pattern in date_field_patterns]
-        if any(match):
-            count += 1
-
-    if count > 0:
-        status = True
+        p = pattern.match(field.name())
+        if p:
+            status = True
+            break
     else:
-        message = ('<span style="color:red;">Invalid Layer: Please select a vector or raster layer with valid '
-                   'timeseries data.')
-        status = False
+        message = (f'<span style="color:red;">Invalid Layer: Please select a vector or raster layer with valid timeseries data.')
 
     return status, message
 
@@ -85,18 +107,52 @@ def extractDateValueAttributes(attributes: dict) -> list:
     :param attributes: Dictionary of feature attributes
     :return: List of tuples (datetime, float)
     """
-    pattern_options = [r'^D(\d{8})$', r'(\d{8})$', r'^D_(\d{8})$']
-    date_value_patterns = [re.compile(pattern) for pattern in pattern_options]
-    date_value_list = []
+    rgx_dt = r'(.*)((19|20)\d{2}[\s\-\._]?[01]\d[\s\-\.]?[0123]\d)T?([012]\d[:\.]?[0-5]\d[0-5]?\d?)?(.*)'
+    pattern = re.compile(rgx_dt)
+    d_dt_fmt = {8: '%Y%m%d', 12: '%Y%m%d%H%M', 14: '%Y%m%d%H%M%S'}
 
+    d_date_value = {'los': [], 'h': [], 'v': [], 'los_sigma': [], 'h_sigma': [], 'v_sigma': []}
+    keys_uncertainty = ['err', 'sigma', 'std']
     for key, value in attributes.items():
-        match = [pattern.match(key) for pattern in date_value_patterns]
-        if any(match):
-            date_str = next(m.group(1) for m in match if m)
-            date_obj = datetime.strptime(date_str, '%Y%m%d')
-            date_value_list.append((date_obj, float(value)))
+	
+        p = pattern.match(key.lower())
+        # Skip if no match
+        if not p:
+            continue
 
-    return np.array(date_value_list, dtype=object)
+        # Some values are NULL
+        try:
+            value = float(value)
+        except Exception as _:
+            value = np.nan
+			
+        # Groups: 1) string before, 2) date, 3) -, 4) time, 5) string after
+        s_before = '' if p.group(1) is None else p.group(1) 
+        s_date = '' if p.group(2) is None else p.group(2) 
+        s_time = '' if p.group(4) is None else p.group(4) 
+        s_after = '' if p.group(5) is None else p.group(5) 
+
+        datetime_str = re.sub(r'[\s:\.\-_]?', '', s_date+s_time)
+        date_obj = datetime.strptime(datetime_str, d_dt_fmt[len(datetime_str)])
+        s_tag = re.sub(r'[\s:\.\-_]?', '', s_before+s_after)
+        key_add = '_sigma' if any([ele in s_tag for ele in keys_uncertainty]) else ''
+
+        # Assign
+        if not s_tag or 'los' in s_tag:
+            d_date_value['los'+key_add].append((date_obj, float(value)))
+        elif 'h' in s_tag:
+            d_date_value['h'+key_add].append((date_obj, float(value)))
+        elif 'v' in s_tag:
+            d_date_value['v'+key_add].append((date_obj, float(value)))
+        else:
+            d_date_value['los'+key_add].append((date_obj, float(value)))
+            
+    # Convert to numpy
+    for key in d_date_value.keys():
+        d_date_value[key] = np.array(d_date_value[key], dtype=object)
+
+    #return np.array(date_value_list, dtype=object)
+    return d_date_value
 
 
 def getVectorFields(layer):

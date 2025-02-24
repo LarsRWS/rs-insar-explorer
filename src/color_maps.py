@@ -108,3 +108,31 @@ class Vik(ColorMaps):
             (0.95, QColor(108, 15, 7)),
             (1., QColor(90, 0, 8)),
         ]
+
+class RWB(ColorMaps):
+    """BWR_R color map. Taken from https://matplotlib.org/stable/users/explain/colors/colormaps.html"""
+    def __init__(self):
+        super().__init__()
+        self.ramp = [
+            (0.00, QColor(255,0,0)),
+            (0.05, QColor(255,24,24)),
+            (0.10, QColor(255,50,50)),
+            (0.15, QColor(255,76,76)),
+            (0.20, QColor(255,102,102)),
+            (0.25, QColor(255,128,128)),
+            (0.30, QColor(255,152,152)),
+            (0.35, QColor(255,178,178)),
+            (0.40, QColor(255,204,204)),
+            (0.45, QColor(255,230,230)),
+            (0.50, QColor(254,254,255)),
+            (0.55, QColor(230,230,255)),
+            (0.60, QColor(204,204,255)),
+            (0.65, QColor(178,178,255)),
+            (0.70, QColor(152,152,255)),
+            (0.75, QColor(126,126,255)),
+            (0.80, QColor(102,102,255)),
+            (0.85, QColor(76,76,255)),
+            (0.90, QColor(49,49,255)),
+            (0.95, QColor(24,24,255)),
+            (1.00, QColor(0,0,255)),
+        ]

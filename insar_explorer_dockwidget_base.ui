@@ -504,8 +504,18 @@
                               <normaloff>:/colormaps/icons/colormaps/turbo.png</normaloff>:/colormaps/icons/colormaps/turbo.png</iconset>
                             </property>
                            </item>
-                          </widget>
-                         </item>
+                           <item>
+                            <property name="text">
+                             <string>RWB</string>
+                            </property>
+                            <property name="icon">
+                             <iconset>
+                              <normaloff>:/colormaps/icons/colormaps/bwr_r.png</normaloff>:/colormaps/icons/colormaps/bwr_r.png
+                             </iconset>
+                             </property>
+                            </item>
+                           </widget>
+                          </item>
                          <item>
                           <widget class="QCheckBox" name="cb_colormap_reverse">
                            <property name="toolTip">

@@ -126,7 +126,9 @@ class InsarMap:
             if color_ramp_name == 'Roma':
                 color_ramp = color_maps.Roma()
             if color_ramp_name == 'Vik':
-                color_ramp = color_maps.Vik()
+                color_ramp = color_maps.Vik()                
+            if color_ramp_name == 'RWB':
+                color_ramp = color_maps.RWB()
 
             if self.color_ramp_reverse_flag:
                 color_ramp.reverse()
@@ -179,9 +181,13 @@ class InsarMap:
             color = color_ramp.getColor(color_ratio)
             color.setAlphaF(self.alpha)
             symbol.setColor(color)
-            symbol.setSize(self.symbol_size)
-            symbol.symbolLayer(0).setStrokeWidth(self.stroke_width)
-            symbol.symbolLayer(0).setStrokeColor(QColor("gray"))
+            
+            if layer.geometryType() == 0:
+                symbol.setSize(self.symbol_size)
+                symbol.symbolLayer(0).setStrokeWidth(self.stroke_width)
+                symbol.symbolLayer(0).setStrokeColor(QColor("gray"))
+            elif layer.geometryType() == 2:
+                pass
 
             if i == 0:
                 lower = float('-inf')

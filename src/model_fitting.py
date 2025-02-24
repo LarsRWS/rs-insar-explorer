@@ -49,7 +49,7 @@ class FittingModels:
         self.x = x
         self.y = y
         self.model = model
-        self.ordinal_dates = self.datesToOrdinal()
+        self.ordinal_dates = self.datesToOrdinal()        
 
     def datesToOrdinal(self):
         return np.array([x.toordinal() for x in self.x])

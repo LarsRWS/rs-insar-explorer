@@ -127,27 +127,33 @@ class PlotTs():
         else:
             self.ax = self.ui.figure.add_subplot(111)
 
-    def plotTs(self, *, dates=None, ts_values=None, ref_values=None, marker=None):
-        self.initializeAxes()
+    def plotTs(self, *, dates=None, ts_values=None, ref_values=None, marker=None, tag=None, bool_init=True, marker_color=None):
+        if bool_init:
+            self.initializeAxes()
 
         if marker is None:
             marker = self.parms['time series plot']['marker']
 
         self.prepareTsValues(dates=dates, ts_values=ts_values, ref_values=ref_values)
-        if self.dates is None:
+        if self.dates is None or self.ts_values is None:
             return
 
         parms = self.parms['time series plot']
         marker_size = parms['marker size']
-        marker_color = parms['marker color']
+        marker_color = parms['marker color'] if marker_color is None else marker_color
         edge_color = parms['marker edge color']
         line_style = parms['line style']
         line_color = parms['line color']
         line_width = parms['line width']
 
-        self.ax.scatter(self.dates, self.plot_values, marker=marker, s=marker_size, c=marker_color)
-        self.ax.scatter(self.dates, self.plot_values, marker=marker, s=marker_size, c=marker_color,
-                        edgecolors=edge_color)
+        #self.ax.scatter(self.dates, self.plot_values, marker=marker, s=marker_size, c=marker_color)
+        #self.ax.scatter(self.dates, self.plot_values, marker=marker, s=marker_size, c=marker_color,
+        #                edgecolors=edge_color)
+
+        v = self.ax.scatter(self.dates, self.plot_values, marker=marker, s=marker_size, c=marker_color)
+        if tag is not None:
+            v.set_label(tag)
+
         if line_style:
             self.ax.plot(self.dates, self.plot_values, line_style, color=line_color, linewidth=line_width)
         if self.replicate_flag:
@@ -183,50 +189,56 @@ class PlotTs():
                 self.plot_replicates.append([replicate_dn])
 
         self.decoratePlot(parms=parms)
-        self.fitModel()
+
+        self.fitModel(bool_init=bool_init, marker_color=marker_color)
 
         parms_figure = self.parms['figure']
         self.decorateFigure(parms=parms_figure)
-
+        self.ax.legend()
         self.ui.canvas.draw()
 
-    def fitModel(self):
-        [plot.remove() for plot in self.fit_plot_list]
+    def fitModel(self, bool_init=True, marker_color=None):
+        if bool_init:
+            [plot.remove() for plot in self.fit_plot_list]
         self.ui.canvas.draw_idle()
         self.fit_plot_list = []
-        if self.plot_values is None:
+
+        if self.plot_values is None or isinstance(self.plot_values, int):
             return
         if self.fit_models is []:
             return
 
         fit_line_type = '--'
-        fit_line_color = 'black'
+        fit_line_color = 'black' 
         fit_seasonal = self.fit_seasonal_flag
         for fit_model in self.fit_models:
             model_values, model_x, model_y = (
                 FittingModels(self.dates, self.plot_values, model=fit_model).fit(seasonal=fit_seasonal))
             plot = self.ax.plot(model_x, model_y, fit_line_type, color=fit_line_color)
+            
             self.fit_plot_list.append(plot[0])
             self.ui.canvas.draw_idle()
 
             self.residuals_values = self.plot_values - model_values
-            self.plotResiduals()
+            self.plotResiduals(bool_init, marker_color)
 
-    def plotResiduals(self):
-        [plot.remove() for plot in self.plot_residuals_list]
+    def plotResiduals(self, bool_init=True, marker_color=None):
+        if bool_init:
+            [plot.remove() for plot in self.plot_residuals_list]
         self.plot_residuals_list = []
+
         if self.plot_residuals_flag:
             parms = self.parms['residual plot']
             marker = parms['marker']
             marker_size = parms['marker size']
-            marker_color = parms['marker color']
+            marker_color = parms['marker color'] if marker_color is None else marker_color
             edge_color = parms['marker edge color']
             line_style = parms['line style']
             line_color = parms['line color']
             line_width = parms['line width']
-
+            
             plot_residual = self.ax_residuals.scatter(self.dates, self.residuals_values, marker=marker,
-                                                      c=marker_color, s=marker_size, edgecolors=edge_color)
+                                                      c=marker_color, s=marker_size, edgecolors=marker_color)
             self.plot_residuals_list.append(plot_residual)
             if line_style:
                 plot_residual_line = self.ax_residuals.plot(self.dates, self.residuals_values, line_style,
@@ -241,6 +253,7 @@ class PlotTs():
     def decoratePlot(self, ax=None, parms={}):
         if not ax:
             ax = self.ax
+
         # First set lims then ticks
         self.setFontSize(ax=ax, parms=parms)
         self.setXlims(ax=ax)
@@ -377,18 +390,20 @@ class PlotTs():
     def setYlims(self, ax=None, parms={}):
         if not ax:
             ax = self.ax
-
+            
         # get min/max from data
-        # if ax == self.ax:
-        #     y_min = np.nanmin(self.plot_values)
-        #     y_max = np.nanmax(self.plot_values)
-        # elif ax == self.ax_residuals:
-        #     y_max = np.nanmax(np.abs(self.residuals_values))
-        #     y_min = -y_max
+        if ax == self.ax:
+            _y_min = np.nanmin(self.plot_values)
+            _y_max = np.nanmax(self.plot_values)
+        elif ax == self.ax_residuals:
+            _y_max = np.nanmax(np.abs(self.residuals_values))
+            _y_min = -_y_max
+        else:
+            _ymin, _y_max = 0, 0
 
         # get min/max from axis
         y_min, y_max = ax.get_ylim()
-        y_max = np.abs([y_min, y_max]).max()
+        y_max = np.abs([y_min, y_max, _y_min, _y_max]).max()
         y_min = -y_max
 
         y_range = y_max - y_min
@@ -407,6 +422,7 @@ class PlotTs():
 
         ymin = parms['ymin']
         ymax = parms['ymax']
+
         ax.set_ylim([ymin, ymax])  # TODO: check if works with ymax or ymin=None
 
     def setAxisStyle(self, ax=None, parms={}):
