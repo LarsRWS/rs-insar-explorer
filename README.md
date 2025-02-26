@@ -36,3 +36,6 @@ This plugin is licensed under the GPL-2.0 license. See the LICENSE file for more
 
 ## Contact
 For any questions or issues, please create an issue on the GitHub repository.
+
+## Note
+This repo was forked from [here](https://github.com/luhipi/insar-explorer) and tailored to Rijkswaterstaat (RWS) use cases.
