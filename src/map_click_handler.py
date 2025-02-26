@@ -13,6 +13,7 @@ from .layer_utils import gmtsar_layer as gmtsar_layer_utils
 from .layer_utils import raster_layer as raster_layer_utils
 
 from numpy import isnan as np_isnan
+import numpy as np
 import matplotlib.colors as mcolors
 color_keys = list(mcolors.TABLEAU_COLORS.keys())
 
@@ -186,16 +187,16 @@ class TSClickHandler(MapClickHandler):
     def __init__(self, plugin):
         super().__init__(plugin)
         self.plot_ts = pts.PlotTs(self.ui)
-        self.ts_values = 0
-        self.ref_values = 0
+        self.ts_values = np.array([0])
+        self.ref_values = np.array([0])
         self.raster_layer = raster_layer_utils.RasterTimeseries()
 
     def reset(self):
         self.clearFeatureHighlight()
         self.clearReferenceFeatureHighlight()
 
-        self.ts_values = 0
-        self.ref_values = 0
+        self.ts_values = np.array([0])
+        self.ref_values = np.array([0])
         self.raster_layer.reset()
 
         self.plot_ts.clear()
@@ -270,6 +271,6 @@ class TSClickHandler(MapClickHandler):
         self.plot_ts.plotTs(dates=dates, ts_values=self.ts_values, ref_values=self.ref_values)
 
     def resetReferencePoint(self):
-        self.ref_values = 0
+        self.ref_values = np.array([0])
         self.clearReferenceFeatureHighlight()
         self.plot_ts.plotTs(ref_values=self.ref_values)

@@ -127,7 +127,7 @@ class GuiController(QObject):
         dialog.exec()
 
     def onSettingDialogChanged(self):
-        self.choose_point_click_handler.plot_ts.plotTs()
+        self.choose_point_click_handler.plot_ts.plotTs(bool_init=False)
 
     def setSymbologyUpperRange(self):
         self.ui.sb_symbol_lower_range.blockSignals(True)

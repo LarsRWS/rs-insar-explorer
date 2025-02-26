@@ -15,8 +15,8 @@ class PlotTs():
         self.ui = ui
         self.ax = None
         self.dates = None
-        self.ts_values = 0
-        self.ref_values = 0
+        self.ts_values = np.array([0])
+        self.ref_values = np.array([0])
         self.plot_values = None
         self.residuals_values = None
         script_path = os.path.abspath(__file__)
@@ -107,16 +107,31 @@ class PlotTs():
         self.ui.canvas.draw()
 
     def prepareTsValues(self, *, dates, ts_values=None, ref_values=None):
-        if dates is not None:
-            self.dates = dates
+
+        len_values = np.max([len(ts_values), len(ref_values), len(dates)])
+        valid_values = np.ones(len_values).astype(bool)
+
+        self.dates = dates
 
         if ts_values is not None:
-            self.ts_values = ts_values
+            self.ts_values = ts_values.astype(float)
+            if len(ts_values) == len_values:
+                valid_values[np.isnan(self.ts_values)] = False
 
         if ref_values is not None:
-            self.ref_values = ref_values
+            self.ref_values = ref_values.astype(float)
+            if len(ref_values) == len_values:
+                valid_values[np.isnan(self.ref_values)] = False
 
         self.plot_values = self.ts_values - self.ref_values
+
+        # Remove nan values
+        self.plot_values = self.plot_values[valid_values]
+        self.dates = self.dates[valid_values]
+        if len(ts_values) == len_values:
+            self.ts_values = self.ts_values[valid_values]
+        if len(ref_values) == len_values:
+            self.ref_values = self.ref_values[valid_values]
 
     def initializeAxes(self):
         self.ui.figure.clear()
@@ -134,9 +149,8 @@ class PlotTs():
         if marker is None:
             marker = self.parms['time series plot']['marker']
 
-        self.prepareTsValues(dates=dates, ts_values=ts_values, ref_values=ref_values)
-        if self.dates is None or self.ts_values is None:
-            return
+        if dates is not None and ts_values is not None:
+            self.prepareTsValues(dates=dates, ts_values=ts_values, ref_values=ref_values)
 
         parms = self.parms['time series plot']
         marker_size = parms['marker size']
@@ -198,10 +212,8 @@ class PlotTs():
         self.ui.canvas.draw()
 
     def fitModel(self, bool_init=True, marker_color=None):
-        if bool_init:
-            [plot.remove() for plot in self.fit_plot_list]
+
         self.ui.canvas.draw_idle()
-        self.fit_plot_list = []
 
         if self.plot_values is None or isinstance(self.plot_values, int):
             return
